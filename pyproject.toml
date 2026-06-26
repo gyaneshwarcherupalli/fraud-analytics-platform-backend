@@ -1,0 +1,27 @@
+# pytest configuration
+[pytest]
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+addopts = -v --tb=short --strict-markers
+markers =
+    unit: unit tests
+    integration: integration tests
+    api: API tests
+    slow: slow tests
+
+# Coverage
+[coverage:run]
+source = app
+omit =
+    */tests/*
+    */venv/*
+
+[coverage:report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:

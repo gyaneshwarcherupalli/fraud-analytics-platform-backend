@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # FastAPI Application
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: fraud-analytics-app
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=docker
+      - DEBUG=False
+      - LOG_LEVEL=INFO
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraud_analytics
+      - DB_USER=fraud_admin
+      - DB_PASSWORD=fraud_secure_password_123
+      - KAFKA_BROKER=kafka:9092
+    depends_on:
+      - postgres
+      - kafka
+    volumes:
+      - ../logs:/app/logs
+    networks:
+      - fraud-analytics-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: fraud-analytics-postgres
+    environment:
+      - POSTGRES_DB=fraud_analytics
+      - POSTGRES_USER=fraud_admin
+      - POSTGRES_PASSWORD=fraud_secure_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../database/postgres/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ../database/postgres/seed_data.sql:/docker-entrypoint-initdb.d/02-seed_data.sql
+    networks:
+      - fraud-analytics-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fraud_admin -d fraud_analytics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: fraud-analytics-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - fraud-analytics-network
+    restart: unless-stopped
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: fraud-analytics-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_INIT_LIMIT: 5
+    networks:
+      - fraud-analytics-network
+    restart: unless-stopped
+
+  # Redis for caching (optional but recommended)
+  redis:
+    image: redis:7-alpine
+    container_name: fraud-analytics-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - fraud-analytics-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  fraud-analytics-network:
+    driver: bridge

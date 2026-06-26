@@ -1,0 +1,13 @@
+# Optional dependencies for development and features
+# Install with: pip install -r requirements-optional.txt
+
+# Database drivers
+sqlalchemy==1.4.50
+psycopg2-binary==2.9.9
+snowflake-sqlalchemy==1.5.0
+
+# Message brokers
+kafka-python==2.0.2
+
+# AWS services
+boto3==1.29.7
