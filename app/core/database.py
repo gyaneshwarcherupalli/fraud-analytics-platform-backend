@@ -3,8 +3,7 @@ Core database module for the Fraud Analytics Platform.
 Handles database connections and session management.
 """
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.pool import NullPool
 from typing import Generator
 
@@ -46,6 +45,9 @@ def get_db() -> Generator[Session, None, None]:
 def init_db() -> None:
     """Initialize database tables."""
     try:
+        # Import model registry so SQLAlchemy metadata contains all tables.
+        from app import models  # noqa: F401
+
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables initialized successfully")
     except Exception as e:

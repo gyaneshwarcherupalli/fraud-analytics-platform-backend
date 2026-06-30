@@ -9,6 +9,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.database import init_db
 from app.utils.logger import setup_logging, get_logger
 
 # Setup logging
@@ -24,6 +25,7 @@ async def lifespan(app: FastAPI):
     logger.info("Application startup")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug mode: {settings.debug}")
+    init_db()
     yield
     logger.info("Application shutdown")
 
