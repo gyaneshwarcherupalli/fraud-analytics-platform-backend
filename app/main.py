@@ -8,8 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.transactions import router as transactions_router
 from app.core.config import settings
 from app.core.database import init_db
+from app.core.kafka import ensure_topics_exist
 from app.utils.logger import setup_logging, get_logger
 
 # Setup logging
@@ -26,6 +28,13 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug mode: {settings.debug}")
     init_db()
+
+    try:
+        ensure_topics_exist()
+        logger.info("Kafka topic initialization completed")
+    except Exception as exc:
+        logger.warning("Kafka topic initialization skipped: %s", exc)
+
     yield
     logger.info("Application shutdown")
 
@@ -53,6 +62,9 @@ app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["*"],  # In production, specify allowed hosts
 )
+
+# Register API routers
+app.include_router(transactions_router)
 
 
 # Health check endpoint

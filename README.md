@@ -189,6 +189,46 @@ docker-compose down
 docker-compose down -v
 ```
 
+### Kafka and Zookeeper
+
+Kafka and Zookeeper are configured in `docker/docker-compose.yml` with:
+
+- `zookeeper` service on port `2181`
+- `kafka` service on ports `9092` (internal) and `29092` (host access)
+- `kafka-init` one-shot service that creates topics on startup
+
+Default topics created:
+
+- `transactions`
+- `alerts`
+
+The backend also validates topic existence at application startup via `app/core/kafka.py`.
+
+### Producer and Consumer Configuration
+
+Kafka producer/consumer defaults are configurable in `.env`:
+
+- Producer: `KAFKA_PRODUCER_ACKS`, `KAFKA_PRODUCER_RETRIES`, `KAFKA_PRODUCER_BATCH_SIZE`, `KAFKA_PRODUCER_LINGER_MS`, `KAFKA_PRODUCER_COMPRESSION_TYPE`
+- Consumer: `KAFKA_AUTO_OFFSET_RESET`, `KAFKA_ENABLE_AUTO_COMMIT`, `KAFKA_AUTO_COMMIT_INTERVAL_MS`, `KAFKA_MAX_POLL_RECORDS`
+- Topics: `KAFKA_TOPIC_TRANSACTIONS`, `KAFKA_TOPIC_ALERTS`, `KAFKA_TOPIC_PARTITIONS`, `KAFKA_TOPIC_REPLICATION_FACTOR`
+
+### Kafka Smoke-Test Endpoints
+
+Use these endpoints to verify end-to-end Kafka publishing and consuming from the API:
+
+- `POST /api/transactions/kafka/smoke/publish`
+- `GET /api/transactions/kafka/smoke/consume`
+
+Examples:
+
+```bash
+curl -X POST http://localhost:8000/api/transactions/kafka/smoke/publish \
+    -H "Content-Type: application/json" \
+    -d '{"customer_id":"customer-101","amount":320.50,"merchant":"test-store"}'
+
+curl "http://localhost:8000/api/transactions/kafka/smoke/consume?timeout_ms=2000&max_records=20"
+```
+
 ## 🔐 Security
 
 ### Best Practices

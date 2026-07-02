@@ -53,6 +53,27 @@ class Settings(BaseSettings):
     kafka_topic_transactions: str = os.getenv("KAFKA_TOPIC_TRANSACTIONS", "transactions")
     kafka_topic_alerts: str = os.getenv("KAFKA_TOPIC_ALERTS", "alerts")
     kafka_consumer_group: str = os.getenv("KAFKA_CONSUMER_GROUP", "fraud-detector-group")
+    kafka_client_id: str = os.getenv("KAFKA_CLIENT_ID", "fraud-analytics-backend")
+    kafka_topic_partitions: int = int(os.getenv("KAFKA_TOPIC_PARTITIONS", "3"))
+    kafka_topic_replication_factor: int = int(os.getenv("KAFKA_TOPIC_REPLICATION_FACTOR", "1"))
+
+    # Kafka Producer tuning
+    kafka_producer_acks: str = os.getenv("KAFKA_PRODUCER_ACKS", "all")
+    kafka_producer_retries: int = int(os.getenv("KAFKA_PRODUCER_RETRIES", "5"))
+    kafka_producer_batch_size: int = int(os.getenv("KAFKA_PRODUCER_BATCH_SIZE", "16384"))
+    kafka_producer_linger_ms: int = int(os.getenv("KAFKA_PRODUCER_LINGER_MS", "10"))
+    kafka_producer_compression_type: str = os.getenv("KAFKA_PRODUCER_COMPRESSION_TYPE", "gzip")
+
+    # Kafka Consumer tuning
+    kafka_auto_offset_reset: str = os.getenv("KAFKA_AUTO_OFFSET_RESET", "earliest")
+    kafka_enable_auto_commit: bool = os.getenv("KAFKA_ENABLE_AUTO_COMMIT", "True").lower() == "true"
+    kafka_auto_commit_interval_ms: int = int(os.getenv("KAFKA_AUTO_COMMIT_INTERVAL_MS", "5000"))
+    kafka_max_poll_records: int = int(os.getenv("KAFKA_MAX_POLL_RECORDS", "500"))
+
+    @property
+    def kafka_topics(self) -> List[str]:
+        """List of Kafka topics that must exist for the platform."""
+        return [self.kafka_topic_transactions, self.kafka_topic_alerts]
 
     # AWS Configuration
     aws_region: str = os.getenv("AWS_REGION", "us-east-1")
