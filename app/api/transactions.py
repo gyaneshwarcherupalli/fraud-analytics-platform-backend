@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from app.services.ingestion.kafka_consumer import FraudKafkaConsumer
 from app.services.ingestion.kafka_producer import FraudKafkaProducer
+from app.services.ingestion.transaction_generator import SyntheticTransactionGenerator
 from app.utils.exceptions import KafkaException
 
 
@@ -39,6 +40,15 @@ class KafkaConsumeResponse(BaseModel):
 	status: str
 	record_count: int
 	records: List[Dict[str, Any]]
+
+
+class SyntheticPublishResponse(BaseModel):
+	"""Response body for synthetic batch publish endpoint."""
+
+	status: str
+	topic: str
+	published_count: int
+	transactions: List[Dict[str, Any]]
 
 
 @router.post("/kafka/smoke/publish", response_model=KafkaPublishResponse)
@@ -93,4 +103,30 @@ async def consume_smoke_transactions(
 		status="ok",
 		record_count=len(records),
 		records=records,
+	)
+
+
+@router.post("/kafka/synthetic/publish", response_model=SyntheticPublishResponse)
+async def publish_synthetic_transactions(
+	count: int = Query(default=10, ge=1, le=1000),
+	customer_id: Optional[str] = Query(default=None),
+	delay_ms: int = Query(default=0, ge=0, le=5000),
+	seed: Optional[int] = Query(default=None),
+) -> SyntheticPublishResponse:
+	"""Generate synthetic transactions and publish them to Kafka."""
+	generator = SyntheticTransactionGenerator(seed=seed)
+	try:
+		transactions = generator.publish_batch(
+			count=count,
+			customer_id=customer_id,
+			delay_ms=delay_ms,
+		)
+	except KafkaException as exc:
+		raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+	return SyntheticPublishResponse(
+		status="published",
+		topic="transactions",
+		published_count=len(transactions),
+		transactions=transactions,
 	)

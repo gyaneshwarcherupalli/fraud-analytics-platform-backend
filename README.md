@@ -217,6 +217,7 @@ Kafka producer/consumer defaults are configurable in `.env`:
 Use these endpoints to verify end-to-end Kafka publishing and consuming from the API:
 
 - `POST /api/transactions/kafka/smoke/publish`
+- `POST /api/transactions/kafka/synthetic/publish`
 - `GET /api/transactions/kafka/smoke/consume`
 
 Examples:
@@ -225,6 +226,8 @@ Examples:
 curl -X POST http://localhost:8000/api/transactions/kafka/smoke/publish \
     -H "Content-Type: application/json" \
     -d '{"customer_id":"customer-101","amount":320.50,"merchant":"test-store"}'
+
+curl -X POST "http://localhost:8000/api/transactions/kafka/synthetic/publish?count=50&delay_ms=20&seed=7"
 
 curl "http://localhost:8000/api/transactions/kafka/smoke/consume?timeout_ms=2000&max_records=20"
 ```

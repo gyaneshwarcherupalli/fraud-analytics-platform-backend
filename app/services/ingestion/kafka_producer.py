@@ -36,6 +36,13 @@ class FraudKafkaProducer:
         """Publish a transaction event to the transactions topic."""
         self.send_message(settings.kafka_topic_transactions, transaction, key=key)
 
+    def send_transactions(self, transactions: list[Dict[str, Any]]) -> None:
+        """Publish multiple transaction events and flush once for efficiency."""
+        for transaction in transactions:
+            transaction_key = transaction.get("transaction_id")
+            self.send_transaction(transaction=transaction, key=transaction_key)
+        self.flush()
+
     def send_alert(self, alert: Dict[str, Any], key: Optional[str] = None) -> None:
         """Publish an alert event to the alerts topic."""
         self.send_message(settings.kafka_topic_alerts, alert, key=key)
