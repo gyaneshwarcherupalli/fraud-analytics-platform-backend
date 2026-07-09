@@ -3,8 +3,11 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from kafka.errors import KafkaError
 
+from app.core.database import SessionLocal
 from app.core.config import settings
 from app.core.kafka import get_consumer
+from app.repositories.transaction_repository import TransactionRepository
+from app.utils.exceptions import DatabaseException
 from app.utils.exceptions import KafkaException
 from app.utils.logger import get_logger
 
@@ -53,6 +56,27 @@ class FraudKafkaConsumer:
             self._consumer.commit()
         except KafkaError as exc:
             raise KafkaException(f"Failed to commit Kafka offsets: {exc}") from exc
+
+    def poll_and_store_transactions(self, timeout_ms: int = 1000, max_records: int = 100) -> Dict[str, Any]:
+        """Poll transactions topic and persist records into PostgreSQL."""
+        records = self.poll_messages(timeout_ms=timeout_ms, max_records=max_records)
+        db = SessionLocal()
+        try:
+            repository = TransactionRepository(db)
+            stored_count = repository.upsert_many_raw_transactions(records)
+            db.commit()
+            if not settings.kafka_enable_auto_commit:
+                self.commit()
+            return {
+                "record_count": len(records),
+                "stored_count": stored_count,
+                "records": records,
+            }
+        except Exception as exc:
+            db.rollback()
+            raise DatabaseException(f"Failed to persist Kafka transaction records: {exc}") from exc
+        finally:
+            db.close()
 
     def close(self) -> None:
         """Close consumer resources."""

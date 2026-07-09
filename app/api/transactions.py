@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.services.ingestion.kafka_consumer import FraudKafkaConsumer
 from app.services.ingestion.kafka_producer import FraudKafkaProducer
 from app.services.ingestion.transaction_generator import SyntheticTransactionGenerator
+from app.utils.exceptions import DatabaseException
 from app.utils.exceptions import KafkaException
 
 
@@ -39,6 +40,7 @@ class KafkaConsumeResponse(BaseModel):
 
 	status: str
 	record_count: int
+	stored_count: int
 	records: List[Dict[str, Any]]
 
 
@@ -90,19 +92,22 @@ async def consume_smoke_transactions(
 	max_records: int = Query(default=25, ge=1, le=500),
 	group_id: Optional[str] = Query(default=None),
 ) -> KafkaConsumeResponse:
-	"""Poll Kafka transaction topic for smoke-test verification."""
+	"""Poll Kafka transactions and persist raw records into PostgreSQL."""
 	consumer = FraudKafkaConsumer(topics=["transactions"], group_id=group_id)
 	try:
-		records = consumer.poll_messages(timeout_ms=timeout_ms, max_records=max_records)
+		result = consumer.poll_and_store_transactions(timeout_ms=timeout_ms, max_records=max_records)
 	except KafkaException as exc:
 		raise HTTPException(status_code=503, detail=str(exc)) from exc
+	except DatabaseException as exc:
+		raise HTTPException(status_code=500, detail=str(exc)) from exc
 	finally:
 		consumer.close()
 
 	return KafkaConsumeResponse(
 		status="ok",
-		record_count=len(records),
-		records=records,
+		record_count=result["record_count"],
+		stored_count=result["stored_count"],
+		records=result["records"],
 	)
 
 
