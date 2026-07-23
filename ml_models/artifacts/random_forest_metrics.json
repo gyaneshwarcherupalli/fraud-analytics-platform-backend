@@ -1,0 +1,120 @@
+{
+  "model_name": "RandomForestClassifier",
+  "model_version": "rf_v1",
+  "feature_names": [
+    "amount",
+    "account_age_days",
+    "distance_from_home_km",
+    "transaction_velocity_1h",
+    "hour",
+    "is_international",
+    "has_chargeback_history",
+    "avg_ticket_30d",
+    "is_night_txn",
+    "channel_in_store",
+    "day_of_week",
+    "device_type_mobile",
+    "merchant_category_travel",
+    "device_type_desktop",
+    "channel_online",
+    "is_weekend",
+    "merchant_category_utilities",
+    "device_type_pos_terminal",
+    "merchant_category_gaming",
+    "merchant_category_groceries"
+  ],
+  "threshold": 0.39778076007265367,
+  "metrics": {
+    "accuracy": 0.832,
+    "precision": 0.3903381642512077,
+    "recall": 0.4908869987849332,
+    "f1_score": 0.43487621097954793,
+    "roc_auc": 0.7866506538456629,
+    "best_f1_from_pr_curve": 0.4348762109790544,
+    "predicted_positive_rate": 0.1656,
+    "samples_train": 18750.0,
+    "samples_test": 6250.0
+  },
+  "top_feature_importances": [
+    {
+      "feature": "amount",
+      "importance": 0.26537386223701814
+    },
+    {
+      "feature": "account_age_days",
+      "importance": 0.150592984825432
+    },
+    {
+      "feature": "distance_from_home_km",
+      "importance": 0.14305985474887062
+    },
+    {
+      "feature": "avg_ticket_30d",
+      "importance": 0.09251191529048103
+    },
+    {
+      "feature": "hour",
+      "importance": 0.06767142392915378
+    },
+    {
+      "feature": "transaction_velocity_1h",
+      "importance": 0.06639801104935703
+    },
+    {
+      "feature": "day_of_week",
+      "importance": 0.04261825372590118
+    },
+    {
+      "feature": "is_international",
+      "importance": 0.028694213041523354
+    },
+    {
+      "feature": "has_chargeback_history",
+      "importance": 0.02863743833024349
+    },
+    {
+      "feature": "device_type_mobile",
+      "importance": 0.013095249586276168
+    },
+    {
+      "feature": "channel_in_store",
+      "importance": 0.012489310422268907
+    },
+    {
+      "feature": "is_night_txn",
+      "importance": 0.011693852841619085
+    },
+    {
+      "feature": "channel_online",
+      "importance": 0.011495265187718316
+    },
+    {
+      "feature": "merchant_category_groceries",
+      "importance": 0.01116925990653277
+    },
+    {
+      "feature": "device_type_pos_terminal",
+      "importance": 0.010235973957443278
+    },
+    {
+      "feature": "device_type_desktop",
+      "importance": 0.009946541502456874
+    },
+    {
+      "feature": "is_weekend",
+      "importance": 0.009870018653767687
+    },
+    {
+      "feature": "merchant_category_gaming",
+      "importance": 0.008684275355771801
+    },
+    {
+      "feature": "merchant_category_travel",
+      "importance": 0.008372633660652733
+    },
+    {
+      "feature": "merchant_category_utilities",
+      "importance": 0.00738966174751203
+    }
+  ]
+}
