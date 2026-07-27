@@ -1,13 +1,20 @@
 """
 Main FastAPI application entry point for the Fraud Analytics Platform.
 """
-import logging
+from time import perf_counter
+from uuid import uuid4
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.alerts import router as alerts_router
+from app.api.dashboard import router as dashboard_router
+from app.api.fraud import router as fraud_router
+from app.api.health import router as health_router
+from app.api.investigations import router as investigations_router
 from app.api.transactions import router as transactions_router
 from app.core.config import settings
 from app.core.database import init_db
@@ -46,29 +53,59 @@ app = FastAPI(
     version=settings.api_version,
     debug=settings.debug,
     lifespan=lifespan,
+    openapi_url=settings.openapi_url if settings.enable_docs else None,
+    docs_url=settings.docs_url if settings.enable_docs else None,
+    redoc_url=settings.redoc_url if settings.enable_docs else None,
+    swagger_ui_parameters={
+        "displayRequestDuration": True,
+        "docExpansion": "none",
+        "tryItOutEnabled": True,
+    },
 )
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.cors_allow_origins_list,
+    allow_credentials=settings.cors_allow_credentials,
+    allow_methods=settings.cors_allow_methods_list,
+    allow_headers=settings.cors_allow_headers_list,
 )
 
 # Configure Trusted Hosts
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"],  # In production, specify allowed hosts
+    allowed_hosts=settings.trusted_hosts_list,
 )
 
+# Enable gzip compression for larger responses.
+app.add_middleware(GZipMiddleware, minimum_size=settings.gzip_minimum_size)
+
+
+@app.middleware("http")
+async def add_request_context(request: Request, call_next):
+    """Attach a request id and response time headers to every response."""
+    request_id = request.headers.get("X-Request-ID", str(uuid4()))
+    start = perf_counter()
+    response = await call_next(request)
+    duration_ms = (perf_counter() - start) * 1000
+
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Process-Time-MS"] = f"{duration_ms:.2f}"
+    return response
+
+
 # Register API routers
+app.include_router(health_router)
 app.include_router(transactions_router)
+app.include_router(fraud_router)
+app.include_router(alerts_router)
+app.include_router(investigations_router)
+app.include_router(dashboard_router)
 
 
 # Health check endpoint
-@app.get("/health", tags=["health"])
+@app.get("/health", tags=["platform"])
 async def health_check():
     """
     Health check endpoint for the application.
@@ -96,14 +133,15 @@ async def root():
         "description": settings.api_description,
         "version": settings.api_version,
         "health_check": "/health",
-        "docs": "/docs",
-        "redoc": "/redoc",
+        "api_prefix": settings.api_prefix,
+        "docs": settings.docs_url if settings.enable_docs else None,
+        "redoc": settings.redoc_url if settings.enable_docs else None,
     }
 
 
 # Exception handlers
 @app.exception_handler(Exception)
-async def general_exception_handler(request, exc):
+async def general_exception_handler(request: Request, exc: Exception):
     """
     Handle general exceptions.
     
@@ -114,7 +152,7 @@ async def general_exception_handler(request, exc):
     Returns:
         JSON response with error details.
     """
-    logger.error(f"Unhandled exception: {str(exc)}", exc_info=exc)
+    logger.error("Unhandled exception on %s: %s", request.url.path, str(exc), exc_info=exc)
     return JSONResponse(
         status_code=500,
         content={

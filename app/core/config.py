@@ -24,6 +24,19 @@ class Settings(BaseSettings):
     api_title: str = "Fraud Analytics Platform"
     api_description: str = "Real-time fraud detection and analytics platform"
     api_version: str = "1.0.0"
+    api_prefix: str = os.getenv("API_PREFIX", "/api")
+    openapi_url: str = os.getenv("OPENAPI_URL", "/openapi.json")
+    docs_url: str = os.getenv("DOCS_URL", "/docs")
+    redoc_url: str = os.getenv("REDOC_URL", "/redoc")
+    enable_docs: bool = os.getenv("ENABLE_DOCS", "True").lower() == "true"
+
+    # Middleware Configuration
+    cors_allow_origins: str = os.getenv("CORS_ALLOW_ORIGINS", "*")
+    cors_allow_credentials: bool = os.getenv("CORS_ALLOW_CREDENTIALS", "True").lower() == "true"
+    cors_allow_methods: str = os.getenv("CORS_ALLOW_METHODS", "*")
+    cors_allow_headers: str = os.getenv("CORS_ALLOW_HEADERS", "*")
+    trusted_hosts: str = os.getenv("TRUSTED_HOSTS", "*")
+    gzip_minimum_size: int = int(os.getenv("GZIP_MINIMUM_SIZE", "1000"))
 
     # Database Configuration - PostgreSQL
     db_host: str = os.getenv("DB_HOST", "localhost")
@@ -74,6 +87,32 @@ class Settings(BaseSettings):
     def kafka_topics(self) -> List[str]:
         """List of Kafka topics that must exist for the platform."""
         return [self.kafka_topic_transactions, self.kafka_topic_alerts]
+
+    @staticmethod
+    def _parse_csv(value: str) -> List[str]:
+        """Parse comma-separated env vars into a normalized list."""
+        items = [item.strip() for item in value.split(",") if item.strip()]
+        return items or ["*"]
+
+    @property
+    def cors_allow_origins_list(self) -> List[str]:
+        """CORS allowed origins list."""
+        return self._parse_csv(self.cors_allow_origins)
+
+    @property
+    def cors_allow_methods_list(self) -> List[str]:
+        """CORS allowed methods list."""
+        return self._parse_csv(self.cors_allow_methods)
+
+    @property
+    def cors_allow_headers_list(self) -> List[str]:
+        """CORS allowed headers list."""
+        return self._parse_csv(self.cors_allow_headers)
+
+    @property
+    def trusted_hosts_list(self) -> List[str]:
+        """Trusted hosts middleware list."""
+        return self._parse_csv(self.trusted_hosts)
 
     # AWS Configuration
     aws_region: str = os.getenv("AWS_REGION", "us-east-1")
