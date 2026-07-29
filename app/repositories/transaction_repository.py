@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, Iterable, Optional
-from uuid import uuid4
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.transaction import Transaction
@@ -93,6 +93,63 @@ class TransactionRepository:
 			self.upsert_raw_transaction(payload=value, kafka_metadata=kafka_metadata)
 			stored_count += 1
 		return stored_count
+
+	# ------------------------------------------------------------------
+	# Read helpers
+	# ------------------------------------------------------------------
+
+	def get_by_id(self, transaction_id: UUID) -> Optional[Transaction]:
+		"""Return a single transaction by primary key, or None."""
+		return self.db.execute(
+			select(Transaction).where(Transaction.id == transaction_id)
+		).scalar_one_or_none()
+
+	def get_by_ref(self, transaction_ref: str) -> Optional[Transaction]:
+		"""Return a single transaction by reference string, or None."""
+		return self.db.execute(
+			select(Transaction).where(Transaction.transaction_ref == transaction_ref)
+		).scalar_one_or_none()
+
+	def list_transactions(
+		self,
+		*,
+		page: int = 1,
+		page_size: int = 50,
+		customer_id: Optional[str] = None,
+		status: Optional[str] = None,
+		risk_level: Optional[str] = None,
+	) -> Tuple[List[Transaction], int]:
+		"""Return a page of transactions and the total row count.
+
+		Returns:
+			(items, total) where *items* is the current page slice.
+		"""
+		stmt = select(Transaction)
+
+		if customer_id:
+			stmt = stmt.where(Transaction.customer_id == customer_id)
+		if status:
+			stmt = stmt.where(Transaction.status == status)
+
+		total: int = self.db.execute(
+			select(func.count()).select_from(stmt.subquery())
+		).scalar_one()
+
+		offset = (page - 1) * page_size
+		items: List[Transaction] = list(
+			self.db.execute(
+				stmt.order_by(Transaction.occurred_at.desc()).offset(offset).limit(page_size)
+			).scalars().all()
+		)
+		return items, total
+
+	def update_status(self, transaction_id: UUID, status: str) -> Optional[Transaction]:
+		"""Update the processing status of a transaction. Returns updated instance or None."""
+		instance = self.get_by_id(transaction_id)
+		if instance is None:
+			return None
+		instance.status = status
+		return instance
 
 
 def _parse_datetime(raw_value: Any) -> datetime:
