@@ -4,11 +4,14 @@ Main FastAPI application entry point for the Fraud Analytics Platform.
 from time import perf_counter
 from uuid import uuid4
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.alerts import router as alerts_router
 from app.api.dashboard import router as dashboard_router
@@ -20,6 +23,7 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.core.kafka import ensure_topics_exist
 from app.utils.logger import setup_logging, get_logger
+from app.utils.exceptions import FraudAnalyticsException
 
 # Setup logging
 setup_logging()
@@ -86,6 +90,7 @@ app.add_middleware(GZipMiddleware, minimum_size=settings.gzip_minimum_size)
 async def add_request_context(request: Request, call_next):
     """Attach a request id and response time headers to every response."""
     request_id = request.headers.get("X-Request-ID", str(uuid4()))
+    request.state.request_id = request_id
     start = perf_counter()
     response = await call_next(request)
     duration_ms = (perf_counter() - start) * 1000
@@ -140,6 +145,71 @@ async def root():
 
 
 # Exception handlers
+def _error_response(
+    request: Request,
+    *,
+    status_code: int,
+    code: str,
+    message: str,
+    details=None,
+) -> JSONResponse:
+    """Build the common API error envelope."""
+    request_id = getattr(request.state, "request_id", request.headers.get("X-Request-ID", str(uuid4())))
+    content = {
+        "error": {"code": code, "message": message},
+        "request_id": request_id,
+        "path": request.url.path,
+    }
+    if details is not None:
+        content["error"]["details"] = details
+    return JSONResponse(
+        status_code=status_code,
+        content=jsonable_encoder(content),
+        headers={"X-Request-ID": request_id},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Return field-level validation details in the common envelope."""
+    return _error_response(
+        request, status_code=422, code="VALIDATION_ERROR",
+        message="Request validation failed", details=exc.errors(),
+    )
+
+
+@app.exception_handler(FraudAnalyticsException)
+async def domain_exception_handler(request: Request, exc: FraudAnalyticsException):
+    """Translate domain exceptions to their declared HTTP status."""
+    if exc.status_code >= 500:
+        logger.error("Domain error on %s: %s", request.url.path, exc.message, exc_info=exc)
+    return _error_response(
+        request, status_code=exc.status_code, code=exc.code, message=exc.message,
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_exception_handler(request: Request, exc: SQLAlchemyError):
+    """Hide database internals while retaining the exception in server logs."""
+    logger.error("Database error on %s", request.url.path, exc_info=exc)
+    return _error_response(
+        request, status_code=500, code="DATABASE_ERROR",
+        message="A database operation failed",
+    )
+
+
+@app.exception_handler(HTTPException)
+async def api_http_exception_handler(request: Request, exc: HTTPException):
+    """Normalize FastAPI HTTP exceptions while preserving custom headers."""
+    response = _error_response(
+        request, status_code=exc.status_code, code=f"HTTP_{exc.status_code}",
+        message=exc.detail if isinstance(exc.detail, str) else "Request failed",
+        details=None if isinstance(exc.detail, str) else exc.detail,
+    )
+    response.headers.update(exc.headers or {})
+    return response
+
+
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """
@@ -153,12 +223,11 @@ async def general_exception_handler(request: Request, exc: Exception):
         JSON response with error details.
     """
     logger.error("Unhandled exception on %s: %s", request.url.path, str(exc), exc_info=exc)
-    return JSONResponse(
+    return _error_response(
+        request,
         status_code=500,
-        content={
-            "error": "Internal Server Error",
-            "message": str(exc) if settings.debug else "An error occurred",
-        },
+        code="INTERNAL_SERVER_ERROR",
+        message=str(exc) if settings.debug else "An unexpected error occurred",
     )
 
 
