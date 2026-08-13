@@ -24,6 +24,7 @@ from app.core.database import init_db
 from app.core.kafka import ensure_topics_exist
 from app.utils.logger import setup_logging, get_logger
 from app.utils.exceptions import FraudAnalyticsException
+from monitoring.cloudwatch_metrics import publish_metrics_async
 
 # Setup logging
 setup_logging()
@@ -94,6 +95,18 @@ async def add_request_context(request: Request, call_next):
     start = perf_counter()
     response = await call_next(request)
     duration_ms = (perf_counter() - start) * 1000
+
+    metrics = [
+        {"name": "ApiRequests", "value": 1, "unit": "Count",
+         "dimensions": {"Method": request.method}},
+        {"name": "ApiLatency", "value": duration_ms, "unit": "Milliseconds",
+         "dimensions": {"Method": request.method}},
+    ]
+    if 400 <= response.status_code < 500:
+        metrics.append({"name": "ApiClientErrors", "value": 1, "unit": "Count"})
+    elif response.status_code >= 500:
+        metrics.append({"name": "ApiServerErrors", "value": 1, "unit": "Count"})
+    publish_metrics_async(metrics)
 
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Process-Time-MS"] = f"{duration_ms:.2f}"

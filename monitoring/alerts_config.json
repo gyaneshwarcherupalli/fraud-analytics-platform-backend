@@ -1,0 +1,15 @@
+{
+  "namespace": "FraudAnalyticsPlatform",
+  "alarms": [
+    {"name": "api-errors", "description": "API 5xx errors detected", "metric_name": "ApiServerErrors", "statistic": "Sum", "period": 60, "evaluation_periods": 2, "datapoints_to_alarm": 1, "threshold": 5, "comparison_operator": "GreaterThanOrEqualToThreshold"},
+    {"name": "api-latency", "description": "Average API latency is high", "metric_name": "ApiLatency", "statistic": "Average", "period": 300, "evaluation_periods": 2, "datapoints_to_alarm": 2, "threshold": 1000, "comparison_operator": "GreaterThanThreshold"},
+    {"name": "fraud-spike", "description": "Fraud predictions exceed normal volume", "metric_name": "FraudDetected", "statistic": "Sum", "period": 300, "evaluation_periods": 1, "datapoints_to_alarm": 1, "threshold": 25, "comparison_operator": "GreaterThanOrEqualToThreshold"},
+    {"name": "pipeline-failures", "description": "A data pipeline failed", "metric_name": "PipelineFailures", "statistic": "Sum", "period": 300, "evaluation_periods": 1, "datapoints_to_alarm": 1, "threshold": 1, "comparison_operator": "GreaterThanOrEqualToThreshold"}
+  ],
+  "dashboard": [
+    {"title": "API traffic and errors", "metrics": ["ApiRequests", "ApiClientErrors", "ApiServerErrors"], "period": 60, "stat": "Sum"},
+    {"title": "API latency", "metrics": ["ApiLatency"], "period": 60, "stat": "Average"},
+    {"title": "Fraud operations", "metrics": ["TransactionsIngested", "TransactionsScored", "FraudDetected", "AlertsCreated"], "period": 300, "stat": "Sum"},
+    {"title": "Pipeline health", "metrics": ["PipelineSuccess", "PipelineFailures"], "period": 300, "stat": "Sum"}
+  ]
+}

@@ -118,7 +118,15 @@ class Settings(BaseSettings):
     aws_region: str = os.getenv("AWS_REGION", "us-east-1")
     aws_access_key_id: str = os.getenv("AWS_ACCESS_KEY_ID", "")
     aws_secret_access_key: str = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    aws_session_token: str = os.getenv("AWS_SESSION_TOKEN", "")
+    aws_endpoint_url: str = os.getenv("AWS_ENDPOINT_URL", "")
     aws_s3_bucket: str = os.getenv("AWS_S3_BUCKET", "fraud-analytics-bucket")
+    aws_s3_prefix: str = os.getenv("AWS_S3_PREFIX", "fraud-platform")
+    aws_s3_kms_key_id: str = os.getenv("AWS_S3_KMS_KEY_ID", "")
+    cloudwatch_enabled: bool = os.getenv("CLOUDWATCH_ENABLED", "False").lower() == "true"
+    cloudwatch_namespace: str = os.getenv("CLOUDWATCH_NAMESPACE", "FraudAnalyticsPlatform")
+    cloudwatch_environment: str = os.getenv("CLOUDWATCH_ENVIRONMENT", os.getenv("ENVIRONMENT", "development"))
+    cloudwatch_alarm_topic_arn: str = os.getenv("CLOUDWATCH_ALARM_TOPIC_ARN", "")
 
     # Security
     secret_key: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-in-production")

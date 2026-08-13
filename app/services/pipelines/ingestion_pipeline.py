@@ -10,6 +10,7 @@ from app.services.etl.transformation_service import TransformationService
 from app.services.ingestion.kafka_consumer import FraudKafkaConsumer
 from app.utils.exceptions import DatabaseException
 from app.utils.logger import get_logger
+from monitoring.cloudwatch_metrics import publish_metrics_async
 
 
 logger = get_logger(__name__)
@@ -68,9 +69,17 @@ def run_ingestion_batch(
             "status": "success",
         }
         logger.info("Ingestion batch completed: %s", result)
+        publish_metrics_async([
+            {"name": "TransactionsIngested", "value": stored},
+            {"name": "InvalidTransactions", "value": invalid},
+            {"name": "PipelineSuccess", "value": 1,
+             "dimensions": {"Pipeline": "Ingestion"}},
+        ])
         return result
     except Exception as exc:
         db.rollback()
+        publish_metrics_async([{"name": "PipelineFailures", "value": 1,
+                                "dimensions": {"Pipeline": "Ingestion"}}])
         if isinstance(exc, DatabaseException):
             raise
         raise DatabaseException(f"Ingestion pipeline failed: {exc}") from exc

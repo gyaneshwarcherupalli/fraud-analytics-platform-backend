@@ -15,6 +15,7 @@ from app.services.etl.enrichment_service import EnrichmentService
 from app.services.fraud_engine.fraud_scoring import FraudScoringEngine
 from app.utils.exceptions import DatabaseException
 from app.utils.logger import get_logger
+from monitoring.cloudwatch_metrics import publish_metrics_async
 
 
 logger = get_logger(__name__)
@@ -105,9 +106,18 @@ def run_fraud_scoring_batch(*, batch_size: int = 250) -> Dict[str, Any]:
             "status": "success",
         }
         logger.info("Fraud scoring batch completed: %s", result)
+        publish_metrics_async([
+            {"name": "TransactionsScored", "value": scored},
+            {"name": "FraudDetected", "value": alerts_created},
+            {"name": "AlertsCreated", "value": alerts_created},
+            {"name": "PipelineSuccess", "value": 1,
+             "dimensions": {"Pipeline": "FraudScoring"}},
+        ])
         return result
     except Exception:
         db.rollback()
+        publish_metrics_async([{"name": "PipelineFailures", "value": 1,
+                                "dimensions": {"Pipeline": "FraudScoring"}}])
         raise
     finally:
         db.close()
